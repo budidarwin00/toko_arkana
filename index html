@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html><head><style>
+@font-face {
+  font-family: "Optimistic";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Optimistic Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
+}
+:where(html) {
+  font-family: "Optimistic", system-ui, sans-serif;
+}
+:where(code, pre, kbd, samp) {
+  font-family: "Optimistic Mono", ui-monospace, monospace;
+}
+</style><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Rekap Lembur Final Clean</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*{box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+body{margin:0;background:#f8fafc;padding:10px;font-size:13px;max-width:480px;margin:auto}
+h3{margin:0 0 8px;font-size:15px}
+.top{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px}
+.card.green{background:#f0fdf4;border-color:#bbf7d0} .card.blue{background:#eff6ff;border-color:#bfdbfe}
+.card b{font-size:12px;display:block;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:11px} th,td{border:1px solid #e2e8f0;padding:6px 4px;text-align:center}
+th{background:#f1f5f9;font-weight:600;font-size:11px}
+input,select{padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%}
+button{padding:10px 14px;border:none;border-radius:10px;background:#0f172a;color:#fff;font-size:13px;width:100%;margin-top:6px}
+.badge{padding:2px 6px;border-radius:99px;font-size:9px;font-weight:600}
+.cocok{background:#dcfce7;color:#166534} .beda{background:#fef9c3;color:#854d0e} .hanya{background:#fecaca;color:#991b1b}
+.scroll{max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;margin-top:6px}
+.input-row{display:grid;grid-template-columns:1fr 90px 80px;gap:6px;align-items:end}
+.muted{font-size:10px;color:#64748b;margin-top:4px}
+</style></head><body>
+<h3>Cocok Lembur - Final Clean</h3>
+<div class="top">
+<div class="card green"><b>Total PDF</b>Index: <span id="tIdxPDF">0</span><br>Upah: <span id="tUpPDF">Rp 0</span></div>
+<div class="card blue"><b>Total (PDF+Manual)</b>Index: <span id="tIdxAll">0</span><br>Upah: <span id="tUpAll">Rp 0</span></div>
+</div>
+
+<div class="card" style="margin-bottom:10px">
+<b>Input</b>
+<div style="margin-top:8px">
+<label style="font-size:11px">Upload PDF (Employee Overtime Report)</label>
+<input type="file" id="pdfFile" accept="application/pdf">
+</div>
+<div style="display:grid;grid-template-columns:1fr 80px;gap:6px;margin-top:10px">
+<div><label style="font-size:11px">Tanggal</label><input id="mTgl" type="date"></div>
+<div><label style="font-size:11px">Jam Lembur</label><select id="mJam"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="1">1</option><option value="5">5</option></select></div>
+</div>
+<div class="muted">Mapping: 2→3.5, 3→5.5, 4→7.5, 6→12, 7→14, 8→17 | Index auto: <span id="prevIdx" style="font-weight:600">7.5</span></div>
+<button onclick="addManual()">+ Tambah Manual</button>
+</div>
+
+<div class="card">
+<b>Riwayat - Tanggal 1 | Index 1 | Tanggal 2 | Index 2 | Selisih</b>
+<div class="muted">Tgl1 & Idx1 dari PDF, Tgl2 & Idx2 dari Manual, Selisih = Idx1-Idx2</div>
+<div class="scroll">
+<table id="tblRiwayat"><thead><tr><th>Tanggal 1</th><th>Index 1</th><th>Tanggal 2</th><th>Index 2</th><th>Selisih</th></tr></thead><tbody></tbody></table>
+</div>
+</div>
+
+<script>
+let pdfData=[], manualData=[];
+const mapIdx={2:3.5,3:5.5,4:7.5,6:12,7:14,8:17,1:1.5,5:10};
+function getIdx(j){return mapIdx[j]!==undefined?mapIdx[j]:(1.5+(j-1)*2);}
+function recalc(){
+ var gaji=5000000; var upahPerJam=gaji/173; var idxPDF=0, idxMan=0;
+ pdfData.forEach(d=>idxPDF+=d.index); manualData.forEach(d=>idxMan+=d.index);
+ document.getElementById('tIdxPDF').textContent=idxPDF;
+ document.getElementById('tIdxAll').textContent=idxPDF+idxMan;
+ document.getElementById('tUpPDF').textContent='Rp '+(idxPDF*upahPerJam).toLocaleString('id-ID');
+ document.getElementById('tUpAll').textContent='Rp '+((idxPDF+idxMan)*upahPerJam).toLocaleString('id-ID');
+}
+function render(){
+ recalc(); riwayat();
+ document.getElementById('prevIdx').textContent=getIdx(parseFloat(document.getElementById('mJam').value)||4);
+}
+function addManual(){
+ var tgl=document.getElementById('mTgl').value || new Date().toISOString().split('T')[0];
+ var jam=parseFloat(document.getElementById('mJam').value); var idx=getIdx(jam);
+ manualData.push({tgl:tgl,jam:jam,index:idx});
+ render();
+}
+function riwayat(){
+ var tbody=document.querySelector('#tblRiwayat tbody'); tbody.innerHTML='';
+ var map={};
+ pdfData.forEach(function(d){ if(!map[d.tgl]) map[d.tgl]={pdf:null,manual:null}; map[d.tgl].pdf=d; });
+ manualData.forEach(function(d){ if(!map[d.tgl]) map[d.tgl]={pdf:null,manual:null}; map[d.tgl].manual=d; });
+ Object.keys(map).sort().forEach(function(tgl){
+   var p=map[tgl].pdf, m=map[tgl].manual;
+   var t1=p?p.tgl:'', i1=p?p.index:'', t2=m?m.tgl:'', i2=m?m.index:'', selisih='';
+   if(p&&m) selisih=(p.index-m.index);
+   else if(p) selisih=p.index;
+   else selisih=-m.index;
+   var status = (p&&m)?(Math.abs(selisih)<0.01?'COCOK':'BEDA'):(p?'HANYA PDF':'HANYA MANUAL');
+   var cls = status==='COCOK'?'cocok':(status==='BEDA'?'beda':'hanya');
+   tbody.innerHTML+='<tr><td>'+t1+'</td><td>'+i1+'</td><td>'+t2+'</td><td>'+i2+'</td><td>'+selisih+'<br><span class="badge '+cls+'">'+status+'</span></td></tr>';
+ });
+}
+document.getElementById('mTgl').valueAsDate=new Date();
+document.getElementById('mJam').addEventListener('change',function(){document.getElementById('prevIdx').textContent=getIdx(parseFloat(this.value));});
+document.getElementById('pdfFile').addEventListener('change', async function(e){
+ var file=e.target.files[0]; if(!file) return;
+ try{
+   var buf=await file.arrayBuffer(); var pdf=await pdfjsLib.getDocument({data:buf}).promise; var fullText='';
+   for(var i=1;i<=pdf.numPages;i++){ var page=await pdf.getPage(i); var content=await page.getTextContent(); var txt=content.items.map(function(it){return it.str;}).join(' '); fullText+='\n'+txt; }
+   var lines=fullText.split('\n'); var results=[];
+   lines.forEach(function(line){
+     var m=line.match(/(\d{2} \w{3} \d{4})/);
+     if(m){
+       var nums=line.trim().split(/\s+/).filter(function(n){return !isNaN(parseFloat(n));}).map(function(n){return parseFloat(n);});
+       var idx=nums.length?nums[nums.length-1]:0;
+       if(idx>0){ 
+         var months={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+         var parts=m[1].split(' '); var iso=parts[2]+'-'+(months[parts[1]]||'09')+'-'+parts[0];
+         results.push({tgl:iso,jam:4,index:idx});
+       }
+     }
+   });
+   if(results.length){ pdfData=results; render(); }
+ }catch(err){}
+});
+pdfData=[{tgl:'2026-09-02',jam:4,index:7.5},{tgl:'2026-09-04',jam:4,index:7.5},{tgl:'2026-09-05',jam:8,index:17}];
+render();
+</script>
+<script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script></body></html>
